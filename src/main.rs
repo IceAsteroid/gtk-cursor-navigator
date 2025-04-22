@@ -196,16 +196,27 @@ fn main() {
         window.set_keyboard_mode(KeyboardMode::Exclusive);
         window.set_exclusive_zone(0);
 
+        // let css_data = format!(
+        //     ".label-cell {{
+        //         background-color: {};
+        //         color: {};
+        //         border: 1px solid {};
+        //         padding: 10px;
+        //         font-weight: bold;
+        //         font-size: 20px;
+        //         min-width: 40px;
+        //         min-height: 40px;
+        //     }}",
         let css_data = format!(
             ".label-cell {{
                 background-color: {};
                 color: {};
                 border: 1px solid {};
-                padding: 10px;
+                padding: 0px;
                 font-weight: bold;
                 font-size: 20px;
-                min-width: 40px;
-                min-height: 40px;
+                min-width: 0px;
+                min-height: 0px;
             }}",
             config.theme.background_color,
             config.theme.foreground_color,
