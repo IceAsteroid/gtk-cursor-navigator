@@ -5,4 +5,7 @@ TODO list:
     * which causes grids excedding the screen.
 * Highlight the first letter when pressed.
 * The outer lines should be the same pixelated with the inner lines for grids
-* Add the ability to configure core ergonomic keys in config file instead of hardcoded.
+* Add the ability to configure core ergonomic keys to select the two letters of each grid in config file instead of hardcoded.
+* The ergonomic keys should be first letter on left hand, and second letter on right hand.
+  * After all combinations are exhausted, reverse all combinations by first letter on right hand, and seond on right.
+  * After all of above are exhausted, generate the rest combinations for grids with same handed keys.

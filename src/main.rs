@@ -98,8 +98,8 @@ fn read_config<P: AsRef<Path>>(path: P) -> Config {
 /// (27 characters) — total of 729 two-letter tokens — and discard any
 /// tokens already in the primary pool.
 fn generate_token_list(total: usize) -> Vec<String> {
-    let s1 = ["Q", "W", "E", "R", "A", "S", "D", "F", "G"];
-    let s2 = ["U", "I", "O", "P", "H", "J", "K", "L", ";"];
+    let s1 = ["Q", "W", "E", "R", "A", "S", "D", "F", "G", "X", "C", "V", "B"];
+    let s2 = ["U", "I", "O", "P", "H", "J", "K", "L", ";", "N", "M"];
     let mut primary: Vec<String> = s1.iter()
         .flat_map(|&x| {
             s2.iter().map(move |&y| format!("{}{}", x, y))
