@@ -1,0 +1,18 @@
+[grid]
+rows = 5
+columns = 6
+cover_screen = true
+
+[resolution]
+width = 2560
+height = 1440
+
+[theme]
+# background_color = "#282c34"   # Background color inside each cell
+# foreground_color = "#abb2bf"   # Text (foreground) color for each cell
+# line_color       = "#56b6c2"   # Border (separator line) color for each cell
+background_color = "#282c34"   # Supports opacity: this is a dark color with ~80% opacity.
+foreground_color = "#abb2bf"   # Light color with 90% opacity.
+line_color       = "#56b6c2ff"   # Fully opaque border line.
+opacity = 0.7
+exit_key       = "Escape"      # Key to terminate the program (e.g. "Escape" or "q")
