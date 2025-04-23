@@ -14,6 +14,6 @@ TODO list:
   * After all combinations are exhausted, reverse all combinations by first letter on right hand, and seond on right.
   * After all of above are exhausted, generate the rest combinations for cells with same handed keys.
 
-* Turn this repository into a toolset for actions like navigation, right/left clicks, text selection, dragging of cursor
+* Turn this repository into a toolset for actions like navigation, right/left clicks, text selection, dragging of the cursor.
   * To be also independent of any specific window managers under wayland.
   * It should work for a window manager that supports the feature like _mode switching_.
