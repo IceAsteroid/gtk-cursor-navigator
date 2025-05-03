@@ -4,6 +4,8 @@ TODO list:
   * To prevent the label(two letters) size too large in each cell of the grid view
     * which causes cells which are at edge excedding the screen.
 
+* Seperate the program into server & client sides to launch faster.
+
 * Highlight the first letter when pressed.
 
 * The outer lines should be the same pixelated with the inner lines for the grid view
