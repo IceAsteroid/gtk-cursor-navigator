@@ -1,0 +1,216 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
+// * Separate server & client
+// * Default config path and custom config path
+// * Configuration
+
+use serde::Deserialize;
+use std::{collections::HashMap, env};
+
+
+#[derive(Debug, Deserialize)]
+struct ConfGrid {
+    rows: u8,
+    columns: u8,
+    width: Option<u32>,
+    height: Option<u32>,
+    cover_screen: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfTheme {
+    background_color: String,
+    foreground_color: String,
+    line_color: String,
+    background_opacity: String,
+    foreground_opacity: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfShortcut {
+    exit_key: String,
+}
+
+// #[derive(Debug)]
+// struct CliParameters {
+//     name: CliName,
+//     pattern: CliPattern,
+//     opts_args: CliOptsArgs,
+// }
+
+// type CliName = Option<String>;
+
+// type CliPattern = Option<String>;
+
+// type CliOptsArgs = Option<HashMap<String, Option<String>>>;
+
+// // #[derive(Debug)]
+// // struct CliOptsArgsWrapper (pub CliOptsArgs);
+
+// impl CliParameters {
+//     fn new(name: CliName, pattern: CliPattern, opts_args: CliOptsArgs) -> CliParameters {
+//         CliParameters {
+//             name,
+//             pattern,
+//             opts_args,
+//         }
+//     }
+// }
+
+// trait CliOptsExd {
+//     fn insert_args(&mut self, key: String, val: Option<String> );
+//     fn new(x: CliOptsArgs) -> Self;
+// }
+
+// impl CliOptsExd for CliOptsArgs  {
+//     fn insert_args(&mut self, key: String, val: Option<String> ) {
+//         match self {
+//             Some(map) => {
+//                 map.insert(key, val);
+//             }
+//             None => {
+//                 let mut map = HashMap::new();
+//                 map.insert(key, val);
+//                 *self = Some(map);
+//             }
+//         }
+//     }
+//     fn new(x: CliOptsArgs) -> Self {
+//         x
+//     }
+// }
+
+// fn parse_cli_paras(cli_paras: &[String]) -> CliParameters {
+//     let mut cli_paras_1: CliParameters =
+//         CliParameters::new(None, None, None);
+//     if cli_paras.is_empty() {
+//         return cli_paras_1
+//     }
+//     let mut cli_opts_args: CliOptsArgs = CliOptsArgs::new(None);
+//     let mut prev_opt: &String = &cli_paras[0];
+//     for (idx, arg) in cli_paras.iter().enumerate() {
+//         let arg_owned = arg.clone();
+//         if idx == 0 {
+//             cli_paras_1.name = Some(arg_owned);
+//         }
+//         else if idx == 1 {
+//             if !arg.starts_with("-") {
+//                 cli_paras_1.pattern = Some(arg_owned);
+//             } else {
+//                 cli_opts_args.insert_args(arg_owned, None);
+//                 prev_opt = arg;
+//             }
+//         }
+//         else if arg.starts_with("-")  {
+//             // cli_opts_args.insert(arg_owned, None);
+//             prev_opt = arg;
+//         }
+//         else {
+//             cli_opts_args.insert(prev_opt.clone(), Some(arg_owned));
+//         }
+//     }
+//     cli_paras_1.opts_args = cli_opts_args;
+//     cli_paras_1
+// }
+
+// fn main() {
+//     let cli_args: Vec<String> = env::args().collect();
+//     let conf_dir = "~/.config/gtk-cursor-navigator";
+//     let conf_name = "config.toml";
+//     println!("{:?}", cli_args);
+//     let parsed_paras = parse_cli_paras(&cli_args);
+//     println!("{:?}", &parsed_paras);
+
+// }
+
+type CliName = Option<String>;
+type CliPattern = Option<String>;
+type CliOptsArgs = Option<HashMap<String, Option<String>>>;
+
+#[derive(Debug)]
+struct CliParameters {
+    name: CliName,
+    pattern: CliPattern,
+    opts_args: CliOptsArgs,
+}
+
+impl CliParameters {
+    fn new(name: CliName, pattern: CliPattern, opts_args: CliOptsArgs) -> Self {
+        Self { name, pattern, opts_args }
+    }
+}
+
+trait CliOptsExd {
+    fn insert_opt_arg(&mut self, key: String, val: Option<String>);
+    fn new(x: CliOptsArgs) -> Self;
+}
+
+impl CliOptsExd for CliOptsArgs {
+    fn insert_opt_arg(&mut self, key: String, val: Option<String>) {
+        match self {
+            Some(map) => {
+                map.insert(key, val);
+            }
+            None => {
+                let mut map = HashMap::new();
+                map.insert(key, val);
+                *self = Some(map);
+            }
+        }
+    }
+
+    fn new(x: CliOptsArgs) -> Self {
+        x
+    }
+}
+
+fn parse_cli_paras(cli_paras: &[String]) -> CliParameters {
+    let mut cli_paras_1 = CliParameters::new(None, None, None);
+
+    // Return early if empty
+    if cli_paras.is_empty() {
+        return cli_paras_1;
+    }
+
+    // First parameter is the name
+    cli_paras_1.name = Some(cli_paras[0].clone());
+
+    // Create an empty opts_args container. Notice we use our trait's associated new() method.
+    let mut opts_args: CliOptsArgs = CliOptsArgs::new(None);
+
+    // Instead of `prev_opt: &String`, we keep an owned Option to the last seen option key.
+    let mut last_opt: Option<String> = None;
+
+    // Process second argument, if it exists.
+    if cli_paras.len() > 1 {
+        if !cli_paras[1].starts_with('-') {
+            cli_paras_1.pattern = Some(cli_paras[1].clone());
+        } else {
+            opts_args.insert_opt_arg(cli_paras[1].clone(), None);
+            last_opt = Some(cli_paras[1].clone());
+        }
+    }
+
+    // Process the remainder
+    for arg in cli_paras.iter().skip(2) {
+        if arg.starts_with('-') {
+            opts_args.insert_opt_arg(arg.clone(), None);
+            last_opt = Some(arg.clone());
+        } else {
+            // If it is not an option, it gets attached as a value to the last option key.
+            if let Some(ref key) = last_opt {
+                opts_args.insert_opt_arg(key.clone(), Some(arg.clone()));
+            }
+        }
+    }
+
+    cli_paras_1.opts_args = opts_args;
+    cli_paras_1
+}
+
+fn main() {
+    let cli_args: Vec<String> = env::args().collect();
+    let parsed_paras = parse_cli_paras(&cli_args);
+    println!("{:?}", parsed_paras);
+}
