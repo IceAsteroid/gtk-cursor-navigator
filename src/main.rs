@@ -11,18 +11,45 @@
 // ** Solution 1: Stick with Unix conventions, an option should only take one
 // argument.
 // ** Solution 2: Correctly takes multiple arguments for an option.
-
-use std::env;
+// * Depoly logging that can be triggered by cli options.
 
 mod cli;
 mod conf;
 
+use std::path::PathBuf;
+use std::env;
+use std::collections::HashMap;
+
+use cli::{ cli_paras_check_valid, CliValidParameters, ALLOW_OPTS_ARGS, MUST_PATTERN};
+
 fn main() {
-    let conf_dir: &str = "~/.config/gtk-cursor-navigator";
-    let conf_toml_path: String = conf_dir.to_string() + "/" + "config.toml";
+    let conf_dir: PathBuf = PathBuf::from("~/.config/gtk-cursor-navigator/");
+    // let conf_toml_path: String = conf_dir.to_string() + "/" + "config.toml";
+    let conf_toml_path: PathBuf = conf_dir.join("config.toml");
+
+    MUST_PATTERN.set(false)
+        .expect("The MUST_PATTEN static should only be set once.");
+    ALLOW_OPTS_ARGS.set(true)
+        .expect("The ALLOW_OPTS_ARGS static should only be set once.");
+
+    let valid_paras: CliValidParameters =
+        CliValidParameters {
+            patterns: None,
+            opts_args: Some(HashMap::from([
+                ("-c".to_string(), Some(vec![String::default()])),
+                ("--config".to_string(), Some(vec![String::default()])),
+                ("-s".to_string(), Some(vec![String::default()])),
+                ("--style".to_string(), Some(vec![String::default()])),
+                ("-d".to_string(), None),
+                ("--debug".to_string(), None),
+                ("-l".to_string(), Some(vec![String::default()])),
+                ("--log".to_string(), Some(vec![String::default()])),
+            ]))
+        };
 
     let cli_args: Vec<String> = env::args().collect();
-    let parsed_paras: cli::CliParameters = cli::parse_cli_paras(&cli_args);
+    let parsed_paras: cli::CliParas = cli::cli_paras_parse(&cli_args);
+    cli_paras_check_valid(&parsed_paras, &valid_paras);
 
     let para_name = parsed_paras.name.clone ();
     let para_pattern = parsed_paras.name.clone();
@@ -33,9 +60,10 @@ fn main() {
         println!("YES, -f exists");
     }
 
-    println!("{:?}", parsed_paras);
-    println!("{:?}", conf_toml_path);
-    println!("-f arg: {:?}", parsed_paras.get_arg("-f"));
+    println!("cli_args: {:?}", cli_args);
+    println!("parsed_paras: {:?}", parsed_paras);
+    println!("conf_toml_path: {:?}", conf_toml_path);
+    println!("-f arg: {:?}", parsed_paras.get_args("-f"));
 
     // println!("para_opts_args_unwarp: {:?}", para_opts_args_unwarp);
     // println!("para_opts_args_unwarp: {:?}", para_opts_args_unwarp.is_empty());
