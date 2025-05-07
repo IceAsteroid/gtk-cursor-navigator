@@ -3,9 +3,11 @@
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
+use std::env;
 
 // type CliOptsArgs = HashMap<String, Option<String>>;
-type CliOptsArgs = HashMap<String, Option<Vec<String>>>;
+pub type CliOptsArgs = HashMap<String, Option<Vec<String>>>;
+pub type CliSameOpts<'a> = Vec<(&'a str, &'a str)>;
 
 // If true, a pattern must be specified in cli.
 // pub static mut ALLOW_PATTERN: bool = false;
@@ -14,7 +16,7 @@ pub static MUST_PATTERN: OnceLock<bool> = OnceLock::new();
 // If true, options & arguments are allowed to specified in cli.
 pub static ALLOW_OPTS_ARGS: OnceLock<bool> = OnceLock::new();
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CliParas {
     pub name: Option<String>,
     pub pattern: Option<String>,
@@ -59,10 +61,15 @@ impl CliParas {
             .cloned()
             .flatten()
     }
+    pub fn merge_opts_args(mut self, same_opts: &CliSameOpts) -> Self {
+        self.opts_args = self.opts_args.cli_paras_merge(same_opts);
+        self
+    }
 }
 
-trait CliOptsExd {
+pub trait CliOptsExd {
     fn insert_opt_arg(&mut self, key: String, val: Option<String>);
+    fn cli_paras_merge(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs>;
     fn new(x: Option<CliOptsArgs>) -> Self;
 }
 
@@ -90,6 +97,33 @@ impl CliOptsExd for Option<CliOptsArgs> {
             }
         }
      }
+    // Merge arguments of long & short options that are the same.
+    // Let the long option has the default one.
+    fn cli_paras_merge(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs> {
+        let opts_args = self.as_ref()?;
+        let mut merged_opts_args: CliOptsArgs = HashMap::new();
+        for &(short, long) in same_opts.iter() {
+            let has_short = opts_args.contains_key(short);
+            let has_long = opts_args.contains_key(long);
+            if has_short || has_long {
+                let short_values =
+                    opts_args.get(short).cloned().unwrap_or(None);
+                let long_values =
+                    opts_args.get(long).cloned().unwrap_or(None);
+                let merged_values = match (long_values, short_values) {
+                    (None, None) => None,
+                    (Some(vs), None) | (None, Some(vs)) =>
+                        Some(vs),
+                    (Some(mut vs1), Some(vs2)) => {
+                        vs1.extend(vs2);
+                        Some(vs1)
+                    }
+                };
+                merged_opts_args.insert(long.to_string(), merged_values);
+            }
+        }
+        Some(merged_opts_args)
+    }
     fn new(x: Option<CliOptsArgs>) -> Self {
         x
     }
@@ -153,4 +187,8 @@ pub fn cli_paras_check_valid(cli_paras: &CliParas, valid_paras: &CliValidParamet
     if !ALLOW_OPTS_ARGS.get().copied().unwrap() && cli_opts_args.is_some() {
         panic!("#!Program doesn't allow options & arguments , but specified!")
     }
+}
+
+pub fn get_raw_cli_paras() -> Vec<String> {
+    env::args().collect()
 }
