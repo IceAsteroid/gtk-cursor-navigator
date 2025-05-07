@@ -14,7 +14,11 @@
 // * Implement regular &  debug logging that can be triggered by cli options.
 // * Implement auto testing (for practice).
 
-// * Attach the GPL3 license.
+// [DONE] * Attach the GPL3 license.
+
+// * Add ability to create a help page with the ease of writing explanation for
+// each option, and also other parts of the help page.
+// * Generate a man page.
 
 mod cli;
 mod conf;
