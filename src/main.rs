@@ -1,89 +1,331 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-// * Separate server & client
-// * Default config path and custom config path
-// ** Learn how to generate multiple executables for a Rust project, like in this
-// **,case, a server and a client executables.
-// * Configuration
-// * Needs Fixing: If an option has more than one argument, only the last
-// argument will be taken.
-// ** Solution 1: Stick with Unix conventions, an option should only take one
-// argument.
-// ** Solution 2: Correctly takes multiple arguments for an option.
-// * Implement regular &  debug logging that can be triggered by cli options.
-// * Implement auto testing (for practice).
+extern crate gdk4_sys; // For gdk_keyval_to_unicode
 
-// [DONE] * Attach the GPL3 license.
-
-// * Add ability to create a help page with the ease of writing explanation for
-// each option, and also other parts of the help page.
-// * Generate a man page.
-
-mod cli;
 mod conf;
 
+use std::env;
+use std::net::TcpStream;
+use std::io::{Read, BufReader};
 use std::path::PathBuf;
-use std::collections::HashMap;
+use std::process::Command;
+use std::io::Write;
+use std::char;
+use std::rc::Rc;
+use std::cell::RefCell;
+use clap::{Arg, value_parser, Command as ClapCommand};
+use conf::{
+    APP_NAME, CONF_DIR_DEFAULT, CONF_FILE_SUFFIX, STYLE_FILE_SUFFIX, LOG_DIR_DEFAULT,
+    expand_path,
+};
+use gio::prelude::*;
+use gtk4::{
+    prelude::{WidgetExt, GtkWindowExt, GridExt, DisplayExt, MonitorExt},
+    Application, ApplicationWindow, CssProvider, EventControllerKey, Grid, Label,
+    STYLE_PROVIDER_PRIORITY_APPLICATION,
+};
+use gtk4::gdk::Key;
+use gtk4_layer_shell::{Edge, Layer, KeyboardMode, LayerShell};
+use log::{debug, info};
+use gtk_cursor_navigator::{SharedData};  // Provided by your lib.rs
+use serde_json;
+use glib::translate::IntoGlib;
+use glib::Propagation;
+use gtk4::gdk; // For monitor handling
 
-use cli::{ cli_paras_check_valid, CliSameOpts, CliValidParameters, ALLOW_OPTS_ARGS, MUST_PATTERN};
-use conf::{APP_NAME, CONF_DIR_DEFAULT, CONF_FILE_SUFFIX, LOG_DIR_DEFAULT, STYLE_FILE_SUFFIX};
+/// Connects to the server via TCP (using BufReader) and retrieves the shared data.
+fn retrieve_shared_data_from_server(server_addr: &str) -> SharedData {
+    let stream = TcpStream::connect(server_addr)
+        .expect("Failed to connect to server");
+    let mut reader = BufReader::new(stream);
+    let mut buffer = String::new();
+    reader
+        .read_to_string(&mut buffer)
+        .expect("Failed to read from server");
+    debug!("Received raw data: {}", buffer);
+    serde_json::from_str(&buffer)
+        .expect("Failed to deserialize JSON from server")
+}
 
-fn process_cli_paras() {
-    let valid_paras: CliValidParameters =
-        CliValidParameters {
-            patterns: None,
-            opts_args: Some(HashMap::from([
-                ("-c".to_string(), Some(vec![String::default()])),
-                ("--config".to_string(), Some(vec![String::default()])),
-                ("-s".to_string(), Some(vec![String::default()])),
-                ("--style".to_string(), Some(vec![String::default()])),
-                ("-d".to_string(), None),
-                ("--debug".to_string(), None),
-                ("-l".to_string(), Some(vec![String::default()])),
-                ("--log".to_string(), Some(vec![String::default()])),
-            ]))
-        };
-    let same_opts: CliSameOpts = vec![
-        ("-c", "--config"),
-        ("-s", "--style"),
-        ("-d", "--debug"),
-        ("-l", "--log"),
-    ];
+/// Generates a CSS string from the theme in the configuration.
+/// Note: min-width and min-height are fixed to "0px" per your requirements.
+fn generate_css_from_theme(theme: &gtk_cursor_navigator::conf::ConfTheme) -> String {
+    format!(
+        ".label-cell {{
+            background-color: {};
+            color: {};
+            border: {}px solid {};
+            padding: 5px;
+            font-weight: {};
+            font-size: {}px;
+            min-width: 0px;
+            min-height: 0px;
+        }}",
+        theme.background_color,
+        theme.foreground_color,
+        theme.line_pixel,
+        theme.line_color,
+        theme.font_weight,
+        theme.font_size,
+    )
+}
 
-    let cli_args: Vec<String> = cli::get_raw_cli_paras();
-    let parsed_paras: cli::CliParas = cli::cli_paras_parse(&cli_args);
-    let parsed_merged_paras = parsed_paras
-        .clone()
-        .merge_opts_args(&same_opts);
-    cli_paras_check_valid(&parsed_paras, &valid_paras);
+/// The GTK activation function builds the layer‑shell window with a grid view.
+/// Each cell displays its token and its Label widget is saved for later use in determining
+/// its on‑screen coordinates. Two key controllers are installed: one for exiting the app
+/// (using a configured shortcut) and one for handling token input. When a complete token is
+/// typed, the target cell’s Label widget is queried for its position using
+/// `translate_coordinates()`. Its center is determined and (after adding a correction factor for
+/// your reserved left margin) the coordinates are sent to ydotool as absolute pixel values
+/// using the command:
+///     ydotool mousemove --absolute -x <X> -y <Y>
+fn activate(application: &gtk4::Application, shared_data: SharedData, css_data: String) {
+    let window = ApplicationWindow::new(application);
+    let config = &shared_data.config;
 
-    if parsed_paras.contains_opt("-c"){
-        println!("YES, -f exists");
+    window.set_decorated(false);
+    window.set_title(Some("Layer Shell Grid Overlay"));
+    // window.set_opacity(config.theme.foreground_opacity as f64);
+    window.set_opacity(config.theme.opacity as f64);
+
+    if config.grid.cover_screen {
+        window.connect_realize(|win| {
+            win.set_anchor(Edge::Top, true);
+            win.set_anchor(Edge::Bottom, true);
+            win.set_anchor(Edge::Left, true);
+            win.set_anchor(Edge::Right, true);
+            win.set_margin(Edge::Top, 0);
+            win.set_margin(Edge::Bottom, 0);
+            win.set_margin(Edge::Left, 0);
+            win.set_margin(Edge::Right, 0);
+        });
+    } else {
+        window.set_default_size(config.grid.width as i32, config.grid.height as i32);
     }
 
-    println!("cli_args: {:?}", cli_args);
-    println!("parsed_paras: {:?}", parsed_paras);
-    println!("parsed_merged_paras: {:?}", parsed_merged_paras);
-    println!("-f arg: {:?}", parsed_paras.get_args("-f"));
+    window.init_layer_shell();
+    window.set_layer(Layer::Overlay);
+    window.set_keyboard_mode(KeyboardMode::Exclusive);
+    window.set_exclusive_zone(0);
+
+    let provider = CssProvider::new();
+    provider.load_from_data(css_data.as_str());
+    if let Some(display) = gtk4::gdk::Display::default() {
+        // Using the deprecated method as in your original code.
+        gtk4::StyleContext::add_provider_for_display(
+            &display,
+            &provider,
+            STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
+
+    // Create and store each cell's Label in a vector.
+    let cell_labels: Rc<RefCell<Vec<Label>>> = Rc::new(RefCell::new(Vec::new()));
+    let grid = Grid::new();
+    grid.set_focusable(true);
+    grid.set_row_homogeneous(true);
+    grid.set_column_homogeneous(true);
+    grid.set_hexpand(true);
+    grid.set_vexpand(true);
+    grid.set_margin_top(0);
+    grid.set_margin_bottom(0);
+    grid.set_margin_start(0);
+    grid.set_margin_end(0);
+
+    let rows = config.grid.rows as i32;
+    let columns = config.grid.columns as i32;
+    for row in 0..rows {
+        for col in 0..columns {
+            let index = (row as usize * (columns as usize)) + (col as usize);
+            let token = if index < shared_data.tokens.len() {
+                &shared_data.tokens[index]
+            } else {
+                ""
+            };
+            let cell_label = Label::new(Some(token));
+            cell_label.add_css_class("label-cell");
+            grid.attach(&cell_label, col, row, 1, 1);
+            cell_labels.borrow_mut().push(cell_label);
+        }
+    }
+    window.set_child(Some(&grid));
+
+    // --- Key Controller for Exit ---
+    let key_controller = EventControllerKey::new();
+    {
+        let exit_key = config.shortcut.exit_key;
+        key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _modifiers| {
+            let key_u32: u32 = keyval.into_glib();
+            if key_u32 == exit_key {
+                std::process::exit(0);
+            }
+            Propagation::Proceed
+        });
+    }
+    window.add_controller(key_controller);
+
+    window.present();
+    window.grab_focus();
+
+    // --- Additional Key Controller for Token Input and Cursor Movement ---
+    // Retrieve screen resolution from the first monitor.
+    let (res_width, res_height) = if let Some(display) = gtk4::gdk::Display::default() {
+        let monitors = display.monitors();
+        if monitors.n_items() > 0 {
+            let monitor = monitors
+                .item(0)
+                .and_then(|obj| obj.downcast::<gdk::Monitor>().ok())
+                .expect("Failed to get monitor from list");
+            let geometry = monitor.geometry();
+            (geometry.width() as f64, geometry.height() as f64)
+        } else {
+            (800.0, 600.0)
+        }
+    } else {
+        (800.0, 600.0)
+    };
+
+    let num_rows = config.grid.rows as usize;
+    let num_columns = config.grid.columns as usize;
+    let reserved_left = config.reserved.left as f64; // correction for left-side bar
+
+    let input_buffer: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
+    let tokens_for_match = shared_data.tokens.clone();
+    let cell_labels_for_move = Rc::clone(&cell_labels);
+
+    // Clone the window so it can be used within the closure.
+    let win_for_translation = window.clone();
+
+    let key_controller2 = EventControllerKey::new();
+    {
+        let buffer_cb = Rc::clone(&input_buffer);
+        key_controller2.connect_key_pressed(move |_controller, keyval, _keycode, _modifiers| {
+            let key_uint: u32 = keyval.into_glib();
+            let unicode = unsafe { gdk4_sys::gdk_keyval_to_unicode(key_uint) };
+            if unicode != 0 {
+                if let Some(ch) = char::from_u32(unicode) {
+                    let final_char = if ch.is_alphabetic() { ch.to_ascii_uppercase() } else { ch };
+                    buffer_cb.borrow_mut().push(final_char);
+                }
+            }
+            let current_input = buffer_cb.borrow().clone();
+            if !current_input.is_empty() {
+                let matching: Vec<(usize, String)> = tokens_for_match.iter()
+                    .enumerate()
+                    .filter_map(|(idx, token)| {
+                        if token.starts_with(&current_input) {
+                            Some((idx, token.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if matching.is_empty() {
+                    buffer_cb.borrow_mut().clear();
+                } else if matching.len() == 1 && matching[0].1 == current_input {
+                    println!("Targeting cell: token {} (cell index {}).", matching[0].1, matching[0].0);
+                    let index = matching[0].0;
+
+                    // Retrieve the corresponding Label widget.
+                    let cell_label = cell_labels_for_move.borrow()[index].clone();
+                    // Use translate_coordinates with floating-point zero offsets.
+                    if let Some((label_x, label_y)) = cell_label.translate_coordinates(&win_for_translation, 0.0, 0.0) {
+                        let alloc = cell_label.allocation();
+                        // Compute the center of the label.
+                        let center_x = label_x as f64 + (alloc.width() as f64 / 2.0);
+                        let center_y = label_y as f64 + (alloc.height() as f64 / 2.0);
+                        // Apply a horizontal correction based on reserved_left.
+                        let abs_x = center_x + reserved_left;
+                        let abs_y = center_y;
+                        // Convert to integer pixel coordinates.
+                        let abs_x_int = abs_x.round() as i32;
+                        let abs_y_int = abs_y.round() as i32;
+                        println!("Moving cursor to: x={} y={}", abs_x_int, abs_y_int);
+
+                        // Use ydotool to move the mouse pointer.
+                        let status = Command::new("ydotool")
+                            .arg("mousemove")
+                            .arg("--absolute")
+                            .arg("-x")
+                            .arg(format!("{}", abs_x_int))
+                            .arg("-y")
+                            .arg(format!("{}", abs_y_int))
+                            .status()
+                            .expect("Failed to execute ydotool");
+
+                        if status.success() {
+                            println!("Pointer moved successfully.");
+                        } else {
+                            println!("ydotool failed with exit code: {:?}", status);
+                        }
+                        std::process::exit(0);
+                    } else {
+                        println!("Failed to translate cell label coordinates relative to window.");
+                    }
+                } else if current_input.len() >= 2 {
+                    buffer_cb.borrow_mut().clear();
+                }
+            }
+            Propagation::Proceed
+        });
+        window.add_controller(key_controller2);
+    }
 }
 
 fn main() {
-    // let conf_dir: PathBuf = PathBuf::from("~/.config/gtk-cursor-navigator/");
-    // let conf_toml_path: PathBuf = conf_dir.join("config.toml");
-    // println!("conf_toml_path: {:?}", conf_toml_path);
+    let name = "gtk-cursor-navigator";
 
-    MUST_PATTERN.set(false)
-        .expect("The MUST_PATTEN static should only be set once.");
-    ALLOW_OPTS_ARGS.set(true)
-        .expect("The ALLOW_OPTS_ARGS static should only be set once.");
+    APP_NAME.set(name).expect("APP_NAME already initialized");
+    CONF_DIR_DEFAULT
+        .set(PathBuf::from(format!("~/.config/{}", name)))
+        .expect("CONF_DIR_DEFAULT already initialized");
+    CONF_FILE_SUFFIX
+        .set(".toml")
+        .expect("CONF_FILE_SUFFIX already initialized");
+    STYLE_FILE_SUFFIX
+        .set(".css")
+        .expect("STYLE_FILE_SUFFIX already initialized");
+    LOG_DIR_DEFAULT
+        .set(PathBuf::from("/tmp/"))
+        .expect("LOG_DIR_DEFAULT already initialized");
 
-    process_cli_paras();
+    let command = ClapCommand::new(name)
+        .author("IcyTomato")
+        .version("0.1")
+        .about("GTK client for retrieving shared configuration and tokens")
+        .arg(
+            Arg::new("server")
+                .short('s')
+                .long("server")
+                .value_name("SERVER")
+                .help("Sets the server address (e.g., 127.0.0.1:7878)")
+                .value_parser(value_parser!(String))
+                .default_value("127.0.0.1:7878"),
+        )
+        .arg(
+            Arg::new("debug")
+                .long("debug")
+                .help("Enable debug logging")
+                .action(clap::ArgAction::SetTrue),
+        );
+    let matches = command.get_matches();
 
-    APP_NAME.set("gtk-cursor-navigator");
-    CONF_DIR_DEFAULT.set(PathBuf::from(
-        "~/.config/".to_string() + APP_NAME.get().copied().unwrap()));
-    CONF_FILE_SUFFIX.set(".toml");
-    STYLE_FILE_SUFFIX.set(".css");
-    LOG_DIR_DEFAULT.set(PathBuf::from("/tmp/"));
+    env_logger::init();
+    if matches.get_flag("debug") {
+        debug!("Client debug mode enabled");
+    }
+
+    let server_addr = matches.get_one::<String>("server").unwrap();
+    debug!("Connecting to server at {}", server_addr);
+    let shared_data = retrieve_shared_data_from_server(server_addr);
+    debug!("Shared data retrieved: {:?}", shared_data);
+
+    let css_data = generate_css_from_theme(&shared_data.config.theme);
+
+    let app = Application::new(Some("sh.wmww.gtk-layer-example"), Default::default());
+    app.connect_activate(move |app| {
+        activate(app, shared_data.clone(), css_data.clone());
+    });
+    app.run_with_args(&[env::args().next().unwrap()]);
 }
