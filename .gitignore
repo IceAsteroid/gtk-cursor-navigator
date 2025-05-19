@@ -1,2 +1,4 @@
 /target
 /src/main.rs_*
+/src/lib.rs_*
+/src/conf.rs_*
