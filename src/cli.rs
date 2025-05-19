@@ -61,15 +61,21 @@ impl CliParas {
             .cloned()
             .flatten()
     }
-    pub fn merge_opts_args(mut self, same_opts: &CliSameOpts) -> Self {
-        self.opts_args = self.opts_args.cli_paras_merge(same_opts);
-        self
+    pub fn merge_opts_args_mut(mut self, same_opts: &CliSameOpts) {
+        self.opts_args = self.opts_args.merge_opts_args(same_opts);
+        // self
+    }
+    pub fn contains_canon_opt(&self, canon: &str) -> bool {
+        self.contains_opt(canon)
+    }
+    pub fn contains_canon_arg(&self, canon: &str) -> bool {
+        self.contains_arg(canon)
     }
 }
 
 pub trait CliOptsExd {
     fn insert_opt_arg(&mut self, key: String, val: Option<String>);
-    fn cli_paras_merge(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs>;
+    fn merge_opts_args(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs>;
     fn new(x: Option<CliOptsArgs>) -> Self;
 }
 
@@ -98,18 +104,18 @@ impl CliOptsExd for Option<CliOptsArgs> {
         }
      }
     // Merge arguments of long & short options that are the same.
-    // Let the long option has the default one.
-    fn cli_paras_merge(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs> {
+    // Let the long option be the default one(canon).
+    fn merge_opts_args(&self, same_opts: &CliSameOpts) -> Option<CliOptsArgs> {
         let opts_args = self.as_ref()?;
         let mut merged_opts_args: CliOptsArgs = HashMap::new();
-        for &(short, long) in same_opts.iter() {
+        for &(short, canon) in same_opts.iter() {
             let has_short = opts_args.contains_key(short);
-            let has_long = opts_args.contains_key(long);
+            let has_long = opts_args.contains_key(canon);
             if has_short || has_long {
                 let short_values =
                     opts_args.get(short).cloned().unwrap_or(None);
                 let long_values =
-                    opts_args.get(long).cloned().unwrap_or(None);
+                    opts_args.get(canon).cloned().unwrap_or(None);
                 let merged_values = match (long_values, short_values) {
                     (None, None) => None,
                     (Some(vs), None) | (None, Some(vs)) =>
@@ -119,7 +125,7 @@ impl CliOptsExd for Option<CliOptsArgs> {
                         Some(vs1)
                     }
                 };
-                merged_opts_args.insert(long.to_string(), merged_values);
+                merged_opts_args.insert(canon.to_string(), merged_values);
             }
         }
         Some(merged_opts_args)
