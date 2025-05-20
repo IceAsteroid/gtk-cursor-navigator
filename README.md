@@ -1,3 +1,5 @@
+* The navigation grid view should only move the cursor to the selected cell but not do actions like clicking. This is to prevent misoperation on a GUI when in a critical situation.
+
 TODO list:
 * Remove hardcoded CSS settings from source code
   * To be configurable in config file.
