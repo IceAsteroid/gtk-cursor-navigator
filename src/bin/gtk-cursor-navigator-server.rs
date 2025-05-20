@@ -2,16 +2,16 @@
 #![allow(unused_variables)]
 
 use clap::{Arg, value_parser, Command};
-use std::env;
+// use std::env;
 use std::net::{TcpListener, TcpStream};
 use std::io::Write;
 use std::thread;
-use std::time::Duration;
 use std::path::PathBuf;
-use gtk_cursor_navigator::conf::{APP_NAME, CONF_DIR_DEFAULT, CONF_FILE_SUFFIX, STYLE_FILE_SUFFIX, LOG_DIR_DEFAULT, PathBufExt, Conf, expand_path};
-use gtk_cursor_navigator::{generate_token_list, SharedData};
-use gtk_cursor_navigator::ErgonomicKeys;
-use serde_json;
+use gtk_cursor_navigator::{
+    conf::{APP_NAME, CONF_DIR_DEFAULT, CONF_FILE_SUFFIX, STYLE_FILE_SUFFIX,
+           LOG_DIR_DEFAULT, PathBufExt, expand_path,},
+    generate_token_list, SharedData, SelectedKeys,
+};
 
 fn handle_client(mut stream: TcpStream, shared_data: &SharedData) {
     let json = serde_json::to_string(shared_data)
@@ -81,11 +81,14 @@ fn main() {
 
     // Generate token list using the common function.
     let total_cells = (config.grid.rows as usize) * (config.grid.columns as usize);
-    // let tokens = generate_token_list(total_cells);
-    let tokens = generate_token_list(total_cells, &ErgonomicKeys::default());
+    // let tokens = generate_token_list(total_cells, &SelectedKeys::default());
+    let selected_keys =
+        SelectedKeys::new(&config.grid.key_left, &config.grid.key_right);
+    let tokens =
+        generate_token_list(total_cells, &selected_keys);
     let shared_data = SharedData {
-        config: config,
-        tokens: tokens,
+        config,
+        tokens,
     };
 
     let port = *matches.get_one::<u16>("port").unwrap();

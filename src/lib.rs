@@ -18,23 +18,38 @@ pub struct SharedData {
 /// eliminating the need to call `.to_string()` individually.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
-pub struct ErgonomicKeys {
+pub struct SelectedKeys {
     pub left: Vec<String>,
     pub right: Vec<String>,
 }
 
-impl Default for ErgonomicKeys {
+impl Default for SelectedKeys {
     fn default() -> Self {
-        // Instead of calling .to_string() on each element, use split_whitespace to build the vector.
-        let left = "1 2 3 4 5 Q W E R T A S D F G Z X C V B"
+        // Instead of calling .to_string() on each element
+        //,use split_whitespace to build the vector.
+        let left = "` 1 2 3 4 5 Q W E R T A S D F G Z X C V B"
             .split_whitespace()
             .map(String::from)
             .collect();
-        let right = "7 8 9 0 Y U I O P [ H J K L ; ' N M , . /"
+        let right = "6 7 8 9 0 - = Y U I O P [ ] H J K L ; ' N M , . /"
             .split_whitespace()
             .map(String::from)
             .collect();
-        ErgonomicKeys { left, right }
+        SelectedKeys { left, right }
+    }
+}
+
+impl SelectedKeys {
+    pub fn new(left: &str, right: &str) -> Self {
+        let left = left
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+        let right = right
+            .split_whitespace()
+            .map(String::from)
+            .collect();
+        SelectedKeys { left, right }
     }
 }
 
@@ -48,7 +63,7 @@ impl Default for ErgonomicKeys {
 ///
 /// The resulting vector is truncated to exactly `total` tokens.
 /// Panics if the total number of unique tokens generated is less than `total`.
-pub fn generate_token_list(total: usize, keys: &ErgonomicKeys) -> Vec<String> {
+pub fn generate_token_list(total: usize, keys: &SelectedKeys) -> Vec<String> {
     let mut tokens: Vec<String> = Vec::new();
 
     // Phase 1: left x right.
