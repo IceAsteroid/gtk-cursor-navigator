@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::default::Default;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 pub static APP_NAME: OnceLock<&str> = OnceLock::new();
@@ -25,19 +25,23 @@ pub struct Conf {
 pub struct ConfGrid {
     pub rows: u8,
     pub columns: u8,
-    pub width: u32,
-    pub height: u32,
-    pub cover_screen: bool,
+    // pub width: u32,
+    // pub height: u32,
+    // pub cover_screen: bool,
+    pub key_left: String,
+    pub key_right: String,
 }
 
 impl Default for ConfGrid {
     fn default() -> Self {
         ConfGrid {
-            rows: 30,
-            columns: 40,
-            width: 1920,
-            height: 1080,
-            cover_screen: true,
+            rows: 10,
+            columns: 20,
+            // width: 1920,
+            // height: 1080,
+            // cover_screen: true,
+            key_left: "` 1 2 3 4 5 Q W E R T A S D F G Z X C V B".to_string(),
+            key_right: "6 7 8 9 0 - = Y U I O P [ ] H J K L ; ' N M , . /".to_string(),
         }
     }
 }
@@ -50,8 +54,8 @@ pub struct ConfTheme {
     pub line_pixel: u8,
     pub line_color: String,
     pub opacity: f32,
-    pub background_opacity: f32,
-    pub foreground_opacity: f32,
+    // pub background_opacity: f32,
+    // pub foreground_opacity: f32,
     pub font_weight: String,
     pub font_size: u8,
 }
@@ -64,8 +68,8 @@ impl Default for ConfTheme {
             line_pixel: 1,
             line_color: "#56b6c2".to_string(),
             opacity: 0.8,
-            background_opacity: 1.0,
-            foreground_opacity: 1.0,
+            // background_opacity: 1.0,
+            // foreground_opacity: 1.0,
             font_weight: "Bold".to_string(),
             font_size: 16,
         }
@@ -87,7 +91,7 @@ impl Default for ReservedNotCovered {
         ReservedNotCovered {
             top: 0,
             bottom: 0,
-            left: 25,
+            left: 0,
             right: 0,
         }
     }

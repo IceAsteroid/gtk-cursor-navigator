@@ -1,5 +1,11 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
+// #![allow(dead_code)]
+// #![allow(unused_variables)]
+
+// TODO List:
+// Complete support for:
+//   let reserved_right = config.reserved.right as f64; // correction for right-side bar
+//   let reserved_top = config.reserved.top as f64; // correction for top-side bar
+
 
 extern crate gdk4_sys; // For gdk_keyval_to_unicode
 
@@ -10,29 +16,27 @@ use std::net::TcpStream;
 use std::io::{Read, BufReader};
 use std::path::PathBuf;
 use std::process::Command;
-use std::io::Write;
 use std::char;
 use std::rc::Rc;
 use std::cell::RefCell;
 use clap::{Arg, value_parser, Command as ClapCommand};
-use conf::{
+use crate::conf::{
     APP_NAME, CONF_DIR_DEFAULT, CONF_FILE_SUFFIX, STYLE_FILE_SUFFIX, LOG_DIR_DEFAULT,
-    expand_path,
 };
-use gio::prelude::*;
+// use gio::prelude::*;
 use gtk4::{
-    prelude::{WidgetExt, GtkWindowExt, GridExt, DisplayExt, MonitorExt},
+    prelude::{WidgetExt, GtkWindowExt, GridExt,
+    ApplicationExtManual, ApplicationExt},
     Application, ApplicationWindow, CssProvider, EventControllerKey, Grid, Label,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
-use gtk4::gdk::Key;
 use gtk4_layer_shell::{Edge, Layer, KeyboardMode, LayerShell};
-use log::{debug, info};
-use gtk_cursor_navigator::{SharedData};  // Provided by your lib.rs
-use serde_json;
-use glib::translate::IntoGlib;
-use glib::Propagation;
-use gtk4::gdk; // For monitor handling
+use log::debug;
+use glib::{
+    translate::IntoGlib,
+    Propagation,
+};
+use gtk_cursor_navigator::SharedData;  // Provided by your lib.rs
 
 /// Connects to the server via TCP (using BufReader) and retrieves the shared data.
 fn retrieve_shared_data_from_server(server_addr: &str) -> SharedData {
@@ -56,7 +60,7 @@ fn generate_css_from_theme(theme: &gtk_cursor_navigator::conf::ConfTheme) -> Str
             background-color: {};
             color: {};
             border: {}px solid {};
-            padding: 5px;
+            padding: 0px;
             font-weight: {};
             font-size: {}px;
             min-width: 0px;
@@ -89,7 +93,7 @@ fn activate(application: &gtk4::Application, shared_data: SharedData, css_data: 
     // window.set_opacity(config.theme.foreground_opacity as f64);
     window.set_opacity(config.theme.opacity as f64);
 
-    if config.grid.cover_screen {
+    // if config.grid.cover_screen {
         window.connect_realize(|win| {
             win.set_anchor(Edge::Top, true);
             win.set_anchor(Edge::Bottom, true);
@@ -100,9 +104,9 @@ fn activate(application: &gtk4::Application, shared_data: SharedData, css_data: 
             win.set_margin(Edge::Left, 0);
             win.set_margin(Edge::Right, 0);
         });
-    } else {
-        window.set_default_size(config.grid.width as i32, config.grid.height as i32);
-    }
+    // } else {
+    //     window.set_default_size(config.grid.width as i32, config.grid.height as i32);
+    // }
 
     window.init_layer_shell();
     window.set_layer(Layer::Overlay);
@@ -168,27 +172,10 @@ fn activate(application: &gtk4::Application, shared_data: SharedData, css_data: 
     window.present();
     window.grab_focus();
 
-    // --- Additional Key Controller for Token Input and Cursor Movement ---
-    // Retrieve screen resolution from the first monitor.
-    let (res_width, res_height) = if let Some(display) = gtk4::gdk::Display::default() {
-        let monitors = display.monitors();
-        if monitors.n_items() > 0 {
-            let monitor = monitors
-                .item(0)
-                .and_then(|obj| obj.downcast::<gdk::Monitor>().ok())
-                .expect("Failed to get monitor from list");
-            let geometry = monitor.geometry();
-            (geometry.width() as f64, geometry.height() as f64)
-        } else {
-            (800.0, 600.0)
-        }
-    } else {
-        (800.0, 600.0)
-    };
-
-    let num_rows = config.grid.rows as usize;
-    let num_columns = config.grid.columns as usize;
     let reserved_left = config.reserved.left as f64; // correction for left-side bar
+    let reserved_right = config.reserved.right as f64; // correction for right-side bar
+    let reserved_top = config.reserved.top as f64; // correction for top-side bar
+    let reserved_bottom = config.reserved.bottom as f64; // correction for bottom-side bar
 
     let input_buffer: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
     let tokens_for_match = shared_data.tokens.clone();
@@ -233,11 +220,11 @@ fn activate(application: &gtk4::Application, shared_data: SharedData, css_data: 
                     if let Some((label_x, label_y)) = cell_label.translate_coordinates(&win_for_translation, 0.0, 0.0) {
                         let alloc = cell_label.allocation();
                         // Compute the center of the label.
-                        let center_x = label_x as f64 + (alloc.width() as f64 / 2.0);
-                        let center_y = label_y as f64 + (alloc.height() as f64 / 2.0);
+                        let center_x = label_x + (alloc.width() as f64 / 2.0);
+                        let center_y = label_y + (alloc.height() as f64 / 2.0);
                         // Apply a horizontal correction based on reserved_left.
-                        let abs_x = center_x + reserved_left;
-                        let abs_y = center_y;
+                        let abs_x = center_x + (reserved_left - reserved_right);
+                        let abs_y = center_y - (reserved_bottom - reserved_top);
                         // Convert to integer pixel coordinates.
                         let abs_x_int = abs_x.round() as i32;
                         let abs_y_int = abs_y.round() as i32;
