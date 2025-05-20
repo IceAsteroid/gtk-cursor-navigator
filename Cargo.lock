@@ -468,7 +468,6 @@ dependencies = [
  "clap",
  "env_logger",
  "gdk4-sys",
- "gio",
  "glib",
  "gtk4",
  "gtk4-layer-shell",
